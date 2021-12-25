@@ -7,7 +7,9 @@ const del = require('del');
 const concat = require('gulp-concat');
 const autoprefixer = require('gulp-autoprefixer');
 const sync = require('browser-sync').create();
-
+const smartGrid = require('smart-grid');
+const sourcemaps = require('gulp-sourcemaps');
+const purgecss = require('gulp-purgecss')
 
 function html() {
   return src('src/**.html')
@@ -26,28 +28,21 @@ function html() {
 
 function scss() {
   return src('src/assets/scss/index.scss')
+    .pipe(sourcemaps.init())
     .pipe(sass())
     .pipe(
       autoprefixer({
         overrideBrowserslist: ['last 2 versions'],
       })
     )
+    .pipe(purgecss({
+        content: ['src/**/**/**.html']
+     }))
     .pipe(csso())
     .pipe(concat('index.css'))
+    .pipe(sourcemaps.write())
     .pipe(dest('dist/assets/css'));
 }
-
-
-
-
-function bootstrap() {
-  return src('src/assets/bootstrap/*.css').pipe(csso())
-  .pipe(concat('bootstrap.css'))
-  .pipe(dest('dist/assets/css'));
-}
-
-
-
 function fonts() {
   return src('src/assets/fonts/**/*').pipe(dest('dist/assets/fonts'));
 }
@@ -68,22 +63,27 @@ function clear() {
   return del('dist');
 }
 
-
+function grid(done) {
+  delete require.cache[require.resolve('./smartgrid.js')];
+  let settings = require('./smartgrid.js');
+  smartGrid('./src/assets/scss', settings);
+  done();
+}
 
 function serve() {
   sync.init({
     server: './dist',
   });
 
-  watch('src/**/**.html', series(html)).on('change', sync.reload);
+  watch('src/**/**/**.html', series(html)).on('change', sync.reload);
   watch('src/assets/scss/**/**.scss', series(scss)).on('change', sync.reload);
   watch('src/assets/js/**/*.js', series(js)).on('change', sync.reload);
   watch('src/assets/img/**.**', series(img)).on('change', sync.reload);
   watch('src/assets/svg/**.**', series(svg)).on('change', sync.reload);
-
+  watch('./smartgrid.js', series(grid)).on('change', sync.reload);
 }
 
-exports.build = series(clear, scss, bootstrap, html, js, fonts, img, svg);
-exports.serve = series(clear, scss, bootstrap, html, js, fonts, img, svg, serve);
+exports.build = series(clear, scss, html, js, fonts, img, svg);
+exports.serve = series(clear, scss, html, js, fonts, img, svg, serve);
 exports.clear = clear;
-
+exports.grid = grid;
